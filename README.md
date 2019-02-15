@@ -82,4 +82,13 @@ int main()
 }
 ```
 
+## Tests
 
+The library contains some tests. To run them you should:
+
+1. create a new project, with this library;
+2. adjust `l3gd20dlhc-driver.test_*` pins in the `mbed_json.app` for SPI and interrupts if you don't use a STM32F3Discovery board; 
+3. connect board;
+4. run `mbed test --greentea --test-by-name "l3gd20-driver-tests-*"`.
+
+Note: during tests the sensor shouldn't be moved.

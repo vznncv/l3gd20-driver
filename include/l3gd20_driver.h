@@ -306,7 +306,7 @@ public:
      */
     void clear_fifo();
 
-    enum DatadaReadyInterruptMode {
+    enum DataReadyInterruptMode {
         DRDY_ENABLE = 1,
         DRDY_DISABLE = 0
     };
@@ -318,14 +318,14 @@ public:
      *
      * @param drdy_mode
      */
-    void set_data_ready_interrupt_mode(DatadaReadyInterruptMode drdy_mode);
+    void set_data_ready_interrupt_mode(DataReadyInterruptMode drdy_mode);
 
     /**
      * Check if data ready interrupt is disabled/enabled.
      *
      * @return 0 if interrupt is disabled, otherwise non-zero value
      */
-    DatadaReadyInterruptMode get_data_ready_interrupt_mode();
+    DataReadyInterruptMode get_data_ready_interrupt_mode();
 
     /**
      * Read current gyroscope data.
@@ -395,7 +395,7 @@ private:
      *
      * @param mode
      */
-    int update_interrupt_register(int mode);
+    DataReadyInterruptMode _update_interrupt_register(int mode);
 
     // current gyroscope sensitivity
     float gyro_sensitivity_dps;
