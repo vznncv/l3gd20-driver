@@ -22,106 +22,172 @@
 
 class GyroProcessor {
 public:
-    GyroProcessor(L3GD20Gyroscope* gyro, int block_size, PinName drdy_pin, PinName indicator)
-        : gyro(gyro)
-        , drdy_int(drdy_pin)
-        , indicator_out(indicator)
-        , block_size(block_size)
+    GyroProcessor(L3GD20Gyroscope *gyro, int block_size, PinName drdy_pin, PinName indicator)
+        : _gyro(gyro)
+        , _drdy_int(drdy_pin)
+        , _indicator_out(indicator)
+        , _block_size(block_size)
+        , _sensor_queue()
+        , _sensor_thread(osPriorityHigh7)
     {
         // configure gyroscope
-        drdy_int.disable_irq();
+        _drdy_int.disable_irq();
+
+        _w_offset[0] = 0.0f;
+        _w_offset[1] = 0.0f;
+        _w_offset[2] = 0.0f;
     }
 
-    void start()
+    /**
+     * Calibrate gyroscope to eliminate offset error.
+     *
+     * During calibration it shouldn't be moved.
+     *
+     * @param calibration_time
+     */
+    void calibrate(float calibration_time)
     {
-        dt = 1.0f / gyro->get_output_data_rate_hz();
-        gyro->set_fifo_watermark(block_size);
-        gyro->clear_fifo();
-        gyro->set_fifo_mode(L3GD20Gyroscope::FIFO_ENABLE);
-        gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
-        drdy_int.enable_irq();
+        _dt = 1.0f / _gyro->get_output_data_rate_hz();
+        _calibration_samples_count = 0;
+        _w_offset[0] = 0.0f;
+        _w_offset[1] = 0.0f;
+        _w_offset[2] = 0.0f;
+        _drdy_int.rise(_sensor_queue.event(callback(this, &GyroProcessor::_calibrate_callback)));
+
+        _gyro->set_fifo_watermark(_block_size);
+        _gyro->clear_fifo();
+        _gyro->set_fifo_mode(L3GD20Gyroscope::FIFO_ENABLE);
+        _gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
+        _drdy_int.enable_irq();
+        _sensor_queue.dispatch(calibration_time * 1000);
+        _drdy_int.disable_irq();
+        _gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_DISABLE);
+
+        if (_calibration_samples_count) {
+            for (int i = 0; i < 3; i++) {
+                _w_offset[i] /= _calibration_samples_count;
+                _w_offset[i] = -_w_offset[i];
+            }
+        }
+    }
+
+    void start_async()
+    {
+        _dt = 1.0f / _gyro->get_output_data_rate_hz();
+        _gyro->set_fifo_watermark(_block_size);
+        _gyro->clear_fifo();
+        _gyro->set_fifo_mode(L3GD20Gyroscope::FIFO_ENABLE);
+        _gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
+        _drdy_int.enable_irq();
 
         // start quaternion
         q[0] = 1.0f;
         q[1] = 0.0f;
         q[2] = 0.0f;
         q[3] = 0.0f;
+
+        // run processing thread
+        _drdy_int.rise(_sensor_queue.event(callback(this, &GyroProcessor::_process_block)));
+        _sensor_thread.start(callback(&_sensor_queue, &EventQueue::dispatch_forever));
     }
 
-    void add_data_processing_event(EventQueue* sensor_processing_queue)
-    {
-        drdy_int.rise(sensor_processing_queue->event(callback(this, &GyroProcessor::process_block)));
-    }
-
-    void process_block()
-    {
-        // disable drdy irq to prevent accident interrupt during FIFO reading
-        drdy_int.disable_irq();
-        indicator_out = !indicator_out;
-        float w[3];
-        float angle;
-        float delta_q[4];
-        float current_q[4];
-        memcpy(current_q, q, sizeof(float) * 4);
-
-        for (int i = 0; i < block_size; i++) {
-            // read data
-            gyro->read_data(w);
-            // convert degrees per second to radian
-            w[0] *= DEG_TO_RADIAN;
-            w[1] *= DEG_TO_RADIAN;
-            w[2] *= DEG_TO_RADIAN;
-            // get rotation quaternion from current accelerometer data
-            // notes:
-            //  - we assumes, that (w[0] * dt, w[1] * dt, w[2] * dt)
-            //    represents Euler angles and using simplified formula,
-            //    convert them into quaternion form
-            //  - due small angles, the Euler angles rotation order isn't important
-            angle = sqrtf(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]) * dt;
-            roration_to_quaternion(angle, w, delta_q);
-            // integrate
-            prodution_quaterniona(current_q, delta_q, current_q);
-            // normalize quaternion
-            normalize_quaternion(current_q);
-        }
-        indicator_out = !indicator_out;
-        drdy_int.enable_irq();
-
-        // update quaternion value
-        mutex.lock();
-        memcpy(q, current_q, sizeof(float) * 4);
-        mutex.unlock();
-    }
     /**
      * Get current object rotation.
      *
      * @param angle
      * @param vec
      */
-    void get_rotation(float* angle_ptr, float vec[3])
+    void get_rotation(float *angle_ptr, float vec[3])
     {
         float current_q[4];
-        mutex.lock();
+        _mutex.lock();
         memcpy(current_q, q, sizeof(float) * 4);
-        mutex.unlock();
+        _mutex.unlock();
 
-        quaternion_to_roration(current_q, angle_ptr, vec);
+        _quaternion_to_roration(current_q, angle_ptr, vec);
     }
 
 private:
-    L3GD20Gyroscope* gyro;
-    InterruptIn drdy_int;
-    DigitalOut indicator_out;
+    L3GD20Gyroscope *_gyro;
+    InterruptIn _drdy_int;
+    DigitalOut _indicator_out;
 
-    int block_size;
-    float dt;
-    Mutex mutex;
+    int _block_size;
+    float _dt;
+    Mutex _mutex;
+
+    EventQueue _sensor_queue;
+    Thread _sensor_thread;
 
     // quaternion that describe current rotation
     float q[4];
-    // helper constants
-    const float DEG_TO_RADIAN = 0.01745329f;
-    // helper function
+
+    // calibration constains
+    float _w_offset[3];
+    int _calibration_samples_count;
+
+    void _calibrate_callback()
+    {
+        // disable drdy irq to prevent accident interrupt during FIFO reading
+        _drdy_int.disable_irq();
+        float w[3];
+
+        for (int i = 0; i < _block_size; i++) {
+            // read data
+            _gyro->read_data(w);
+
+            // accumulate offset
+            _w_offset[0] += w[0];
+            _w_offset[1] += w[1];
+            _w_offset[2] += w[2];
+
+            _calibration_samples_count++;
+        }
+        _drdy_int.enable_irq();
+    }
+
+    void _process_block()
+    {
+        // disable drdy irq to prevent accident interrupt during FIFO reading
+        _drdy_int.disable_irq();
+        _indicator_out = !_indicator_out;
+        float w[3];
+        float angle;
+        float delta_q[4];
+        float current_q[4];
+        memcpy(current_q, q, sizeof(float) * 4);
+
+        for (int i = 0; i < _block_size; i++) {
+            // read data
+            _gyro->read_data(w);
+
+            // compensate offset
+            w[0] += _w_offset[0];
+            w[1] += _w_offset[1];
+            w[2] += _w_offset[2];
+
+            // get rotation quaternion from current accelerometer data
+            // notes:
+            //  - we assumes, that (w[0] * dt, w[1] * dt, w[2] * dt)
+            //    represents Euler angles and using simplified formula,
+            //    convert them into quaternion form
+            //  - due small angles, the Euler angles rotation order isn't important
+            angle = sqrtf(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]) * _dt;
+            _roration_to_quaternion(angle, w, delta_q);
+            // integrate
+            _prodution_quaterniona(current_q, delta_q, current_q);
+            // normalize quaternion
+            _normalize_quaternion(current_q);
+        }
+        _indicator_out = !_indicator_out;
+        _drdy_int.enable_irq();
+
+        // update quaternion value
+        _mutex.lock();
+        memcpy(q, current_q, sizeof(float) * 4);
+        _mutex.unlock();
+    }
+
     /**
      * Calculate quaternion production.
      *
@@ -131,7 +197,7 @@ private:
      * @param q
      * @param out
      */
-    void prodution_quaterniona(const float p[4], const float q[4], float out[4])
+    void _prodution_quaterniona(const float p[4], const float q[4], float out[4])
     {
         float ow = p[0] * q[0] - p[1] * q[1] - p[2] * q[2] - p[3] * q[3];
         float ox = p[0] * q[1] + p[1] * q[0] + p[2] * q[3] - p[3] * q[2];
@@ -148,7 +214,7 @@ private:
      *
      * @param p
      */
-    void normalize_quaternion(float q[4])
+    void _normalize_quaternion(float q[4])
     {
         float k = 1.0f / sqrtf(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]);
         q[0] *= k;
@@ -164,7 +230,7 @@ private:
      * @param angle_ptr
      * @param r
      */
-    void quaternion_to_roration(const float q[4], float* angle_ptr, float r[3])
+    void _quaternion_to_roration(const float q[4], float *angle_ptr, float r[3])
     {
         float half_angle = acosf(q[0]);
         float r_a;
@@ -189,7 +255,7 @@ private:
      * @param r
      * @param q
      */
-    void roration_to_quaternion(const float angle, const float r[3], float q[4])
+    void _roration_to_quaternion(const float angle, const float r[3], float q[4])
     {
         float half_angle = angle / 2;
         float norm_k = 1.0f / sqrtf(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]);
@@ -235,16 +301,16 @@ int main()
     gyroscope.set_full_scale(L3GD20Gyroscope::FULL_SCALE_250);
     gyroscope.set_low_pass_filter_cutoff_freq_mode(L3GD20Gyroscope::LPF_CF0);
     //gyroscope.set_high_pass_filter_cutoff_freq_mode(L3GD20Gyroscope::HPF_CF9);
-    //gyroscope.set_high_pass_filter_mode(L3GD20Gyroscope::HPF_ENABLE);
+    gyroscope.set_high_pass_filter_mode(L3GD20Gyroscope::HPF_DISABLE);
 
     // create helper object to read and process gyroscope data
     int block_size = 24;
     GyroProcessor gyro_processor(&gyroscope, block_size, PE_1, LED5);
-    gyro_processor.add_data_processing_event(&sensor_queue);
-    // run sensor queue
-    sensor_thread.start(callback(&sensor_queue, &EventQueue::dispatch_forever));
-    // start sensor data processing
-    gyro_processor.start();
+    // run calibration
+    wait(0.1f);
+    gyro_processor.calibrate(0.9f);
+    // run data processing
+    gyro_processor.start_async();
 
     // rotation data
     float angle;
@@ -253,10 +319,9 @@ int main()
     while (true) {
         led = !led;
         gyro_processor.get_rotation(&angle, rotation_vec);
-        printf("angle: %+6.2f; x: %+6.2f; y: %+6.2f; z: %+6.2f\n",
-            angle, rotation_vec[0], rotation_vec[1], rotation_vec[2]);
-        wait(0.005f);
+        printf("angle: %+6.2f; x: %+6.2f; y: %+6.2f; z: %+6.2f\n", angle, rotation_vec[0], rotation_vec[1], rotation_vec[2]);
+        wait(0.016f);
         led = !led;
-        wait(0.010f);
+        wait(0.016f);
     }
 }

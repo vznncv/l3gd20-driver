@@ -1,3 +1,25 @@
 {
-  "name": "l3gd20-driver"
+    "name": "l3gd20-driver",
+    "config": {
+        "test_spi_mosi": {
+            "help": "SPI MOSI pin of the L3GD20. It should be used for library tests only",
+            "value": "PA_7"
+        },
+        "test_spi_miso": {
+            "help": "SPI MISO pin of the L3GD20. It should be used for library tests only",
+            "value": "PA_6"
+        },
+        "test_spi_sclk": {
+            "help": "SPI SCLK pin of the L3GD20. It should be used for library tests only",
+            "value": "PA_5"
+        },
+        "test_spi_cs": {
+            "help": "SPI CS of the L3GD20. It should be used for library tests only",
+            "value": "PE_3"
+        },
+        "test_drdy": {
+            "help": "DYDY pin of the L3GD20. It should be used for library tests only",
+            "value": "PE_1"
+        }
+    }
 }

@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
+import importlib
 import itertools
+import json
+import logging
+import os
+import re
 import sys
 from collections import namedtuple
-
-import importlib
-import logging
-import re
 from contextlib import suppress
+from os.path import join, isfile, dirname
 from threading import Thread
 
 logger = logging.getLogger(__name__)
 
 # check dependencies
 DEPENDENCIES = {
+    'PyOpenGL': 'OpenGL',
     'numpy': 'numpy',
     'glumpy': 'glumpy',
     'click': 'click',
@@ -409,6 +412,11 @@ class DemoCube:
         if self._thread is not None:
             raise ValueError("The demo has been run.")
 
+        self._active = True
+        self._thread = Thread(target=self._run)
+        self._thread.start()
+
+    def _run(self):
         window = app.Window()
 
         @window.event
@@ -449,20 +457,16 @@ class DemoCube:
             print("Window has been closed", file=sys.stderr)
             sys.exit(1)
 
-        def run():
-            backend = app.__backend__
-            clock = app.__init__(backend=backend)
-            count = len(backend.windows())
-            while count:
-                count = backend.process(clock.tick())
-                if not self._active:
-                    break
-            with suppress(Exception):
-                window.close()
-
-        self._active = True
-        self._thread = Thread(target=run)
-        self._thread.start()
+        backend = app.__backend__
+        clock = app.__init__(backend=backend)
+        clock.set_fps_limit(30)
+        count = len(backend.windows())
+        while count:
+            count = backend.process(clock.tick())
+            if not self._active:
+                break
+        with suppress(Exception):
+            window.close()
 
     def stop(self):
         if self._thread is None:
@@ -479,15 +483,13 @@ class DemoCube:
         self.stop()
 
 
-def select_serial_port_manually():
+def _autoconfig_select_serial_port():
     com_port_infos = sorted(serial.tools.list_ports.comports(), key=lambda v: v.device)
     if not com_port_infos:
         click.secho("No comports have been detected", fg='red')
         sys.exit(1)
     elif len(com_port_infos) == 1:
-        print("Found one comport: {}".format(com_port_infos[0]))
-        if (not click.confirm('Should it be used?')):
-            sys.exit(1)
+        click.echo("Found one comport: {}".format(com_port_infos[0]))
         com_port_info = com_port_infos[0]
     else:
         click.echo("The following ports are found:")
@@ -507,14 +509,52 @@ _LINE_REGEXES = {
 }
 
 
+def _getcwd():
+    try:
+        return os.environ['PWD']
+    except KeyError:
+        return os.getcwd()
+
+
+def _autoconfig_buadrate(root_dir):
+    baudrate = 9600
+    # try to find arm mbed application config
+    while True:
+        mbed_app_path = join(root_dir, 'mbed_app.json')
+        if isfile(mbed_app_path):
+            try:
+                with open(mbed_app_path, encoding='utf-8') as f:
+                    mbed_app = json.load(f)
+            except Exception:
+                break
+            conf_baudrate = mbed_app.get('target_overrides', {}).get('*', {}).get('platform.stdio-baud-rate')
+            if conf_baudrate:
+                baudrate = conf_baudrate
+                break
+        next_root_dir = dirname(root_dir)
+        if next_root_dir == root_dir:
+            break
+        root_dir = next_root_dir
+
+    return baudrate
+
+
 @click.command(context_settings=dict(help_option_names=['-h', '--help']))
-@click.option('--port', help='Serial port', default=select_serial_port_manually)
-@click.option('--baudrate', help='Serial port baudrate', default='115200', type=click.Choice(map(str, Serial.BAUDRATES)))
+@click.option('--port', help='Serial port')
+@click.option('--baudrate', help='Serial port baudrate', type=click.Choice(map(str, Serial.BAUDRATES)))
 def main(port, baudrate):
+    # if baudrad isn't set, try to detect it from mbed settings
+    if baudrate is None:
+        baudrate = _autoconfig_buadrate(_getcwd())
+        click.echo("Autoconfigure baudrate")
+    # if port isn't set, try to autodetect it
+    if port is None:
+        port = _autoconfig_select_serial_port()
+
     baudrate = int(baudrate)
     click.echo('Selected serial port:')
     click.echo('  - port {}'.format(port))
-    click.echo('  - baudrate {}'.format(port))
+    click.echo('  - baudrate {}'.format(baudrate))
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
     with Serial(port=port, baudrate=baudrate) as ser, DemoCube() as demo_cube:

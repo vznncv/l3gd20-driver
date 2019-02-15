@@ -2,7 +2,7 @@
 
 using namespace l3gd20;
 
-L3GD20Gyroscope::L3GD20Gyroscope(I2C* i2c_ptr)
+L3GD20Gyroscope::L3GD20Gyroscope(I2C *i2c_ptr)
     : register_device(i2c_ptr)
 {
 }
@@ -12,7 +12,7 @@ L3GD20Gyroscope::L3GD20Gyroscope(PinName sda, PinName scl)
 {
 }
 
-L3GD20Gyroscope::L3GD20Gyroscope(SPI* spi_ptr, PinName ssel)
+L3GD20Gyroscope::L3GD20Gyroscope(SPI *spi_ptr, PinName ssel)
     : register_device(spi_ptr, ssel)
 {
 }
@@ -311,7 +311,7 @@ void L3GD20Gyroscope::set_fifo_mode(FIFOMode mode)
         register_device.update_register(CTRL_REG5_ADDR, 0x00, 0x40); // disabled FIFO
         register_device.update_register(FIFO_CTRL_REG_ADDR, 0x00, 0xE0); // configure FIFO bypass mode
     }
-    update_interrupt_register(2);
+    _update_interrupt_register(2);
 }
 
 L3GD20Gyroscope::FIFOMode L3GD20Gyroscope::get_fifo_mode()
@@ -347,22 +347,18 @@ void L3GD20Gyroscope::clear_fifo()
     }
 }
 
-void L3GD20Gyroscope::set_data_ready_interrupt_mode(DatadaReadyInterruptMode drdy_mode)
+void L3GD20Gyroscope::set_data_ready_interrupt_mode(DataReadyInterruptMode drdy_mode)
 {
     if (drdy_mode) {
-        update_interrupt_register(1);
+        _update_interrupt_register(1);
     } else {
-        update_interrupt_register(0);
+        _update_interrupt_register(0);
     }
 }
 
-L3GD20Gyroscope::DatadaReadyInterruptMode L3GD20Gyroscope::get_data_ready_interrupt_mode()
+L3GD20Gyroscope::DataReadyInterruptMode L3GD20Gyroscope::get_data_ready_interrupt_mode()
 {
-    if (update_interrupt_register(3)) {
-        return DRDY_ENABLE;
-    } else {
-        return DRDY_DISABLE;
-    }
+    return _update_interrupt_register(3);
 }
 
 void L3GD20Gyroscope::read_data(float data[3])
@@ -402,15 +398,16 @@ float L3GD20Gyroscope::get_temperature_sensor_sensitivity()
     return -1.0f;
 }
 
-int L3GD20Gyroscope::update_interrupt_register(int mode)
+L3GD20Gyroscope::DataReadyInterruptMode L3GD20Gyroscope::_update_interrupt_register(int mode)
 {
-    int res = 0;
+    DataReadyInterruptMode res;
     FIFOMode fifo_mode;
 
     switch (mode) {
     case 0:
         // disable interrupts
         register_device.update_register(CTRL_REG3_ADDR, 0x00, 0x0F);
+        res = DRDY_DISABLE;
         break;
     case 1:
         // enable interrupt
@@ -422,19 +419,21 @@ int L3GD20Gyroscope::update_interrupt_register(int mode)
             // DRDY interrupt
             register_device.update_register(CTRL_REG3_ADDR, 0x08, 0x0F);
         }
+        res = DRDY_ENABLE;
         break;
     case 2:
         // update interrupt mode
         // note: it can be used if we switch off/of FIFO
-        if (update_interrupt_register(3)) {
-            update_interrupt_register(1);
+        if (_update_interrupt_register(3) == DRDY_ENABLE) {
+            res = _update_interrupt_register(1);
         } else {
-            update_interrupt_register(0);
+            res = _update_interrupt_register(0);
         }
         break;
     case 3:
         // check if register enabled/disabled
-        res = register_device.read_register(CTRL_REG3_ADDR, 0x0F);
+        uint8_t val = register_device.read_register(CTRL_REG3_ADDR, 0x0F);
+        res = val ? DRDY_ENABLE : DRDY_DISABLE;
         break;
     }
     return res;
