@@ -17,6 +17,8 @@ Library allows:
 - use FIFO to reduce communication between microcontroller and mems
 - enable data ready interrupt line
 
+The library is tested and and compatible with Mbed OS 5.13.
+
 ## Driver usage
 
 Typical interface usage contains the following steps:
@@ -27,7 +29,7 @@ Typical interface usage contains the following steps:
 4. invoke driver method to configure L3GD20 for you purposes;
 5. read data using `read_data`, `read_data_dps` or `read_data_16` methods.
 
-The simple program that uses accelerometer with [STM32F3Discovery](https://www.st.com/en/evaluation-tools/stm32f3discovery.html)
+The simple program that uses gyroscope with [STM32F3Discovery](https://www.st.com/en/evaluation-tools/stm32f3discovery.html)
 board is shown bellow:
 
 ```

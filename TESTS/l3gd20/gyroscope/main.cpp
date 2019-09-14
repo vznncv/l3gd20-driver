@@ -25,13 +25,13 @@ void test_teardown_handler(const size_t passed, const size_t failed, const failu
 
 utest::v1::status_t case_setup_handler(const Case *const source, const size_t index_of_case)
 {
-    // reset accelerometer
+    // reset gyroscope
     gyro->init();
     return greentea_case_setup_handler(source, index_of_case);
 }
 
 /**
- * Test accelerometer state after initialization.
+ * Test gyroscope state after initialization.
  */
 void test_init_state()
 {

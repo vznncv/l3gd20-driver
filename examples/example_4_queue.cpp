@@ -166,7 +166,7 @@ private:
             w[1] += _w_offset[1];
             w[2] += _w_offset[2];
 
-            // get rotation quaternion from current accelerometer data
+            // get rotation quaternion from current gyroscope data
             // notes:
             //  - we assumes, that (w[0] * dt, w[1] * dt, w[2] * dt)
             //    represents Euler angles and using simplified formula,
