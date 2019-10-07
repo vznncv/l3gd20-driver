@@ -16,7 +16,7 @@ public:
      *
      * @param i2c_ptr I2C interface
      */
-    L3GD20Gyroscope(I2C* i2c_ptr);
+    L3GD20Gyroscope(I2C *i2c_ptr);
 
     /**
      * Constructor.
@@ -31,7 +31,7 @@ public:
      *
      * @param spi_ptr SPI interface
      */
-    L3GD20Gyroscope(SPI* spi_ptr, PinName ssel);
+    L3GD20Gyroscope(SPI *spi_ptr, PinName ssel);
 
     /**
      * Constructor.
@@ -48,9 +48,12 @@ public:
     /**
      * Initialize device with default settings and test connection.
      *
+     * Note: this method is idempotent.
+     *
+     * @param start if it's `true`, then initially sensor will be enabled, otherwise disabled.
      * @return 0, if device is initialize correctly, otherwise non-zero error code.
      */
-    int init();
+    int init(bool start = true);
 
     enum Registers {
         WHO_AM_I_ADDR = 0x0F, // device identification register

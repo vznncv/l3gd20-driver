@@ -26,10 +26,18 @@ L3GD20Gyroscope::~L3GD20Gyroscope()
 {
 }
 
-int L3GD20Gyroscope::init()
+int L3GD20Gyroscope::init(bool start)
 {
     // check device id
-    uint8_t device_id = register_device.read_register(WHO_AM_I_ADDR);
+    uint8_t device_id;
+
+    // sometimes device glitches and returns wrong device_id. So try to extract it several times
+    for (int i = 0; i < 3; i++) {
+        device_id = register_device.read_register(WHO_AM_I_ADDR);
+        if (device_id == DEVICE_ID) {
+            break;
+        }
+    }
     if (device_id != DEVICE_ID) {
         return MBED_ERROR_CODE_INITIALIZATION_FAILED;
     }
@@ -48,7 +56,7 @@ int L3GD20Gyroscope::init()
     set_high_pass_filter_cutoff_freq_mode(HPF_CF0);
     set_low_pass_filter_cutoff_freq_mode(LPF_CF0);
     set_output_data_rate(ODR_95_HZ);
-    set_gyroscope_mode(G_ENABLE);
+    set_gyroscope_mode(start ? G_ENABLE : G_DISABLE);
 
     return MBED_SUCCESS;
 }
