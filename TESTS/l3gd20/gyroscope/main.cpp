@@ -26,14 +26,22 @@ void test_teardown_handler(const size_t passed, const size_t failed, const failu
 utest::v1::status_t case_setup_handler(const Case *const source, const size_t index_of_case)
 {
     // reset gyroscope
-    gyro->init();
-    return greentea_case_setup_handler(source, index_of_case);
+    int err = gyro->init();
+    // wait to skip noisy data after device enabling
+    wait_ms(100);
+
+    utest::v1::status_t gt_status = greentea_case_setup_handler(source, index_of_case);
+    if (err) {
+        gt_status = STATUS_ABORT;
+    }
+
+    return gt_status;
 }
 
 /**
  * Test gyroscope state after initialization.
  */
-void test_init_state()
+void test_init_state_enabled()
 {
     int err;
 
@@ -52,6 +60,30 @@ void test_init_state()
     TEST_ASSERT_EQUAL(L3GD20Gyroscope::DRDY_DISABLE, gyro->get_sensitivity_dps());
     TEST_ASSERT_EQUAL(L3GD20Gyroscope::DRDY_DISABLE, gyro->get_data_ready_interrupt_mode());
     TEST_ASSERT_EQUAL(L3GD20Gyroscope::G_ENABLE, gyro->get_gyroscope_mode());
+}
+
+/**
+ * Test gyroscope state after initialization.
+ */
+void test_init_state_disabled()
+{
+    int err;
+
+    // check that init isn't failed
+    err = gyro->init(false);
+    TEST_ASSERT_EQUAL(0, err);
+
+    // check parameter
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::DRDY_DISABLE, gyro->get_data_ready_interrupt_mode());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::FIFO_DISABLE, gyro->get_fifo_mode());
+    TEST_ASSERT_EQUAL(0, gyro->get_fifo_watermark());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::HPF_DISABLE, gyro->get_high_pass_filter_mode());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::HPF_CF0, gyro->get_high_pass_filter_cutoff_freq_mode());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::LPF_CF0, gyro->get_low_pass_filter_cutoff_freq_mode());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::ODR_95_HZ, gyro->get_output_data_rate());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::DRDY_DISABLE, gyro->get_sensitivity_dps());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::DRDY_DISABLE, gyro->get_data_ready_interrupt_mode());
+    TEST_ASSERT_EQUAL(L3GD20Gyroscope::G_DISABLE, gyro->get_gyroscope_mode());
 }
 
 float abs_vec3(float vec3[3])
@@ -95,6 +127,15 @@ struct interrupt_counter_t {
 
     const int samples_per_invokation;
 
+    interrupt_counter_t(int samples_count, int invokation_count, float angle, float dt, int samples_per_invokation)
+        : samples_count(samples_count)
+        , invokation_count(invokation_count)
+        , angle(angle)
+        , dt(dt)
+        , samples_per_invokation(samples_per_invokation)
+    {
+    }
+
     void process_interrupt()
     {
         invokation_count++;
@@ -117,7 +158,7 @@ void test_simple_interrupt_usage()
     // gyroscope preparation
     gyro->set_output_data_rate(L3GD20Gyroscope::ODR_95_HZ);
     InterruptIn drdy_pin(MBED_CONF_L3GD20_DRIVER_TEST_DRDY);
-    interrupt_counter_t interrupt_counter = { .samples_count = 0, .invokation_count = 0, .angle = 0, .dt = 1.0f / gyro->get_output_data_rate_hz(), .samples_per_invokation = 1 };
+    interrupt_counter_t interrupt_counter(0, 0, 0, 1.0f / gyro->get_output_data_rate_hz(), 1);
     Callback<void()> interrupt_cb = mbed_highprio_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
     drdy_pin.rise(interrupt_cb);
 
@@ -149,7 +190,7 @@ void test_fifo_interrupt_usage()
     gyro->set_fifo_watermark(fifo_watermark);
     gyro->set_fifo_mode(L3GD20Gyroscope::FIFO_ENABLE);
     InterruptIn drdy_pin(MBED_CONF_L3GD20_DRIVER_TEST_DRDY);
-    interrupt_counter_t interrupt_counter = { .samples_count = 0, .invokation_count = 0, .angle = 0, .dt = 1.0f / gyro->get_output_data_rate_hz(), .samples_per_invokation = fifo_watermark };
+    interrupt_counter_t interrupt_counter(0, 0, 0, 1.0f / gyro->get_output_data_rate_hz(), fifo_watermark);
     Callback<void()> interrupt_cb = mbed_highprio_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
     drdy_pin.rise(interrupt_cb);
 
@@ -173,7 +214,8 @@ void test_fifo_interrupt_usage()
 // test cases description
 #define GyroCase(test_fun) Case(#test_fun, case_setup_handler, test_fun, greentea_case_teardown_handler, greentea_case_failure_continue_handler)
 Case cases[] = {
-    GyroCase(test_init_state),
+    GyroCase(test_init_state_enabled),
+    GyroCase(test_init_state_disabled),
     GyroCase(test_simple_data_reading),
     GyroCase(test_simple_interrupt_usage),
     GyroCase(test_fifo_interrupt_usage)
