@@ -86,6 +86,32 @@ void test_init_state_disabled()
     TEST_ASSERT_EQUAL(L3GD20Gyroscope::G_DISABLE, gyro->get_gyroscope_mode());
 }
 
+void test_multiple_start_stop()
+{
+    L3GD20Gyroscope::GyroscopeMode mode;
+    gyro->set_gyroscope_mode(gyro->G_DISABLE);
+
+    for (int i = 0; i < 4; i++) {
+        mode = gyro->get_gyroscope_mode();
+        TEST_ASSERT_EQUAL(gyro->G_DISABLE, mode);
+
+        gyro->set_gyroscope_mode(gyro->G_ENABLE);
+        mode = gyro->get_gyroscope_mode();
+        TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
+
+        wait_ms(20);
+
+        mode = gyro->get_gyroscope_mode();
+        TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
+
+        gyro->set_gyroscope_mode(gyro->G_DISABLE);
+        mode = gyro->get_gyroscope_mode();
+        TEST_ASSERT_EQUAL(gyro->G_DISABLE, mode);
+
+        wait_ms(20);
+    }
+}
+
 float abs_vec3(float vec3[3])
 {
     return sqrtf(vec3[0] * vec3[0] + vec3[1] * vec3[1] + vec3[2] * vec3[2]);
@@ -216,6 +242,7 @@ void test_fifo_interrupt_usage()
 Case cases[] = {
     GyroCase(test_init_state_enabled),
     GyroCase(test_init_state_disabled),
+    GyroCase(test_multiple_start_stop),
     GyroCase(test_simple_data_reading),
     GyroCase(test_simple_interrupt_usage),
     GyroCase(test_fifo_interrupt_usage)
