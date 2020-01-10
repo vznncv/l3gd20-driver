@@ -565,6 +565,11 @@ def main(port, baudrate):
             except Exception:
                 logger.error("Invalid raw line: {}".format(raw_line))
                 continue
+            #  ignore comments
+            if line.startswith('#') or line.startswith("//"):
+                click.secho(line, fg='green')
+                continue
+
             # parse line
             res = {}
             parsed = True
