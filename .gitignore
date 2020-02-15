@@ -3,6 +3,9 @@
 # QtCreator
 *.autosave
 
+# IDEA
+.idea
+
 # vim swap files
 *.swp
 *~

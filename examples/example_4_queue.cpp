@@ -4,21 +4,26 @@
  * Interrupt and FIFO usage.
  *
  * This sample integrates data, using quaternion math to show current rotation.
- * See: http://stanford.edu/class/ee267/lectures/lecture10.pdf for more details
- *
- * Pin map:
- *
- * - PC_4 - UART TX (stdout/stderr)
- * - PC_5 - UART RX (stdin)
- * - PA_7 - SPI MOSI of the L3GD20
- * - PA_6 - SPI MISO of the L3GD20
- * - PA_5 - SPI SCLK of the L3GD20
- * - PE_3 - SPI SSEL of the L3GD20
- * - PE_1 - INT2 pin of the L3GD20
+ * See: http://stanford.edu/class/ee267/lectures/lecture10.pdf for more details.
  */
 #include "l3gd20_driver.h"
 #include "math.h"
 #include "mbed.h"
+
+/**
+ * Pin map:
+ *
+ * - L3GD20_SPI_MOSI_PIN - SPI MOSI of the L3GD20
+ * - L3GD20_SPI_MISO_PIN - SPI MISO of the L3GD20
+ * - L3GD20_SPI_SCLK_PIN - SPI SCLK of the L3GD20
+ * - L3GD20_SPI_SSEL_PIN - SPI SSEL of the L3GD20
+ * - L3GD20_SPI_INT2 - INT2 pin of the L3GD20
+ */
+#define L3GD20_SPI_MOSI_PIN PA_7
+#define L3GD20_SPI_MISO_PIN PA_6
+#define L3GD20_SPI_SCLK_PIN PA_5
+#define L3GD20_SPI_SSEL_PIN PE_3
+#define L3GD20_SPI_INT2 PE_1
 
 class GyroProcessor {
 public:
@@ -287,9 +292,9 @@ Thread sensor_thread(osPriorityHigh7);
 int main()
 {
     // create separate spi instance
-    SPI spi(PA_7, PA_6, PA_5);
+    SPI spi(L3GD20_SPI_MOSI_PIN, L3GD20_SPI_MISO_PIN, L3GD20_SPI_SCLK_PIN);
     spi.frequency(10000000);
-    L3GD20Gyroscope gyroscope(&spi, PE_3);
+    L3GD20Gyroscope gyroscope(&spi, L3GD20_SPI_SSEL_PIN);
     // initialize device
     int err = gyroscope.init();
     if (err) {
@@ -305,9 +310,9 @@ int main()
 
     // create helper object to read and process gyroscope data
     int block_size = 24;
-    GyroProcessor gyro_processor(&gyroscope, block_size, PE_1, LED5);
+    GyroProcessor gyro_processor(&gyroscope, block_size, L3GD20_SPI_INT2, LED5);
     // run calibration
-    wait(0.1f);
+    ThisThread::sleep_for(100);
     gyro_processor.calibrate(0.9f);
     // run data processing
     gyro_processor.start_async();
@@ -320,8 +325,8 @@ int main()
         led = !led;
         gyro_processor.get_rotation(&angle, rotation_vec);
         printf("angle: %+6.2f; x: %+6.2f; y: %+6.2f; z: %+6.2f\n", angle, rotation_vec[0], rotation_vec[1], rotation_vec[2]);
-        wait(0.016f);
+        ThisThread::sleep_for(16);
         led = !led;
-        wait(0.016f);
+        ThisThread::sleep_for(16);
     }
 }

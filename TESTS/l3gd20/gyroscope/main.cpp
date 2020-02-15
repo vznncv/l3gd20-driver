@@ -28,7 +28,7 @@ utest::v1::status_t case_setup_handler(const Case *const source, const size_t in
     // reset gyroscope
     int err = gyro->init();
     // wait to skip noisy data after device enabling
-    wait_ms(100);
+    ThisThread::sleep_for(100);
 
     utest::v1::status_t gt_status = greentea_case_setup_handler(source, index_of_case);
     if (err) {
@@ -99,7 +99,7 @@ void test_multiple_start_stop()
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
 
-        wait_ms(20);
+        ThisThread::sleep_for(20);
 
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
@@ -108,7 +108,7 @@ void test_multiple_start_stop()
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_DISABLE, mode);
 
-        wait_ms(20);
+        ThisThread::sleep_for(20);
     }
 }
 
@@ -123,7 +123,7 @@ float abs_vec3(float vec3[3])
 void test_simple_data_reading()
 {
     const int n_samples = 8;
-    const float dt = 0.05f;
+    const int dt_ms = 50;
     float gyro_vec[3];
     float angular_velocity_abs[n_samples];
     float angle;
@@ -133,8 +133,8 @@ void test_simple_data_reading()
     for (int i = 0; i < n_samples; i++) {
         gyro->read_data(gyro_vec);
         angular_velocity_abs[i] = abs_vec3(gyro_vec);
-        angle += dt * angular_velocity_abs[i];
-        wait(dt);
+        angle += dt_ms * angular_velocity_abs[i] / 1000.0f;
+        ThisThread::sleep_for(dt_ms);
     }
 
     // check that sensor has noise
@@ -191,11 +191,11 @@ void test_simple_interrupt_usage()
     // run interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
     // wait processing
-    wait_ms(500);
+    ThisThread::sleep_for(500);
     // disable interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_DISABLE);
     drdy_pin.disable_irq();
-    wait_ms(100);
+    ThisThread::sleep_for(100);
 
     // check results
     TEST_ASSERT(interrupt_counter.samples_count > 40);
@@ -223,11 +223,11 @@ void test_fifo_interrupt_usage()
     // run interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
     // wait processing
-    wait_ms(1125);
+    ThisThread::sleep_for(1125);
     // disable interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_DISABLE);
     drdy_pin.disable_irq();
-    wait_ms(100);
+    ThisThread::sleep_for(100);
 
     // check results
     TEST_ASSERT_EQUAL(4, interrupt_counter.invokation_count);

@@ -2,28 +2,31 @@
  * Example of the L3GD20 usage with STM32F3Discovery board.
  *
  * Base example of the L3GD20 usage.
- *
- * Pin map:
- *
- * - PC_4 - UART TX (stdout/stderr)
- * - PC_5 - UART RX (stdin)
- * - PA_7 - SPI MOSI of the L3GD20
- * - PA_6 - SPI MISO of the L3GD20
- * - PA_5 - SPI SCLK of the L3GD20
- * - PE_3 - SPI SSEL of the L3GD20
- * - PE_1 - INT2 pin of the L3GD20
  */
 #include "l3gd20_driver.h"
 #include "math.h"
 #include "mbed.h"
+
+/**
+ * Pin map:
+ *
+ * - L3GD20_SPI_MOSI_PIN - SPI MOSI of the L3GD20
+ * - L3GD20_SPI_MISO_PIN - SPI MISO of the L3GD20
+ * - L3GD20_SPI_SCLK_PIN - SPI SCLK of the L3GD20
+ * - L3GD20_SPI_SSEL_PIN - SPI SSEL of the L3GD20
+ */
+#define L3GD20_SPI_MOSI_PIN PA_7
+#define L3GD20_SPI_MISO_PIN PA_6
+#define L3GD20_SPI_SCLK_PIN PA_5
+#define L3GD20_SPI_SSEL_PIN PE_3
 
 DigitalOut led(LED2);
 
 int main()
 {
     // create driver instance
-    SPI spi(PA_7, PA_6, PA_5);
-    L3GD20Gyroscope gyroscope(&spi, PE_3);
+    SPI spi(L3GD20_SPI_MOSI_PIN, L3GD20_SPI_MISO_PIN, L3GD20_SPI_SCLK_PIN);
+    L3GD20Gyroscope gyroscope(&spi, L3GD20_SPI_SSEL_PIN);
     // initialize device
     int err = gyroscope.init();
     if (err) {
@@ -43,7 +46,7 @@ int main()
         printf("%04d | wx: %+7.2f dps, wy: %+7.2f dps, wz: %+7.2f dps\n", count, x, y, z);
 
         led = !led;
-        wait(0.05);
+        ThisThread::sleep_for(50);
         count++;
     }
 }
