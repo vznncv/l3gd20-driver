@@ -2,22 +2,25 @@
  * Example of the L3GD20 usage with STM32F3Discovery board.
  *
  * Scale demonstration.
- *
- * Pin map:
- *
- * - PC_4 - UART TX (stdout/stderr)
- * - PC_5 - UART RX (stdin)
- * - PA_7 - SPI MOSI of the L3GD20
- * - PA_6 - SPI MISO of the L3GD20
- * - PA_5 - SPI SCLK of the L3GD20
- * - PE_3 - SPI SSEL of the L3GD20
- * - PE_1 - INT2 pin of the L3GD20
  */
 #include "l3gd20_driver.h"
 #include "math.h"
 #include "mbed.h"
 
-void print_axis_val(const char* axis_name, int16_t value)
+/**
+ * Pin map:
+ *
+ * - L3GD20_SPI_MOSI_PIN - SPI MOSI of the L3GD20
+ * - L3GD20_SPI_MISO_PIN - SPI MISO of the L3GD20
+ * - L3GD20_SPI_SCLK_PIN - SPI SCLK of the L3GD20
+ * - L3GD20_SPI_SSEL_PIN - SPI SSEL of the L3GD20
+ */
+#define L3GD20_SPI_MOSI_PIN PA_7
+#define L3GD20_SPI_MISO_PIN PA_6
+#define L3GD20_SPI_SCLK_PIN PA_5
+#define L3GD20_SPI_SSEL_PIN PE_3
+
+void print_axis_val(const char *axis_name, int16_t value)
 {
     // convert value binary representation to show precision/resolution settings
     int sign = 1;
@@ -42,7 +45,7 @@ void print_axis_val(const char* axis_name, int16_t value)
     printf("%s: %c0b%s (raw)\n", axis_name, sign >= 0 ? '+' : '-', buff);
 }
 
-void read_and_print_data(L3GD20Gyroscope* gyro)
+void read_and_print_data(L3GD20Gyroscope *gyro)
 {
     int16_t data_16[3];
     // read data
@@ -58,8 +61,8 @@ DigitalOut led(LED2);
 int main()
 {
     // create separate spi instance
-    SPI spi(PA_7, PA_6, PA_5);
-    L3GD20Gyroscope gyroscope(&spi, PE_3);
+    SPI spi(L3GD20_SPI_MOSI_PIN, L3GD20_SPI_MISO_PIN, L3GD20_SPI_SCLK_PIN);
+    L3GD20Gyroscope gyroscope(&spi, L3GD20_SPI_SSEL_PIN);
     // initialize device
     int err = gyroscope.init();
     if (err) {
@@ -76,7 +79,7 @@ int main()
         L3GD20Gyroscope::FULL_SCALE_1000,
         L3GD20Gyroscope::FULL_SCALE_2000
     };
-    const char* scale_mode_names[4] = {
+    const char *scale_mode_names[4] = {
         "Full scale:  250 dps",
         "Full scale:  500 dps",
         "Full scale: 1000 dps",
@@ -87,13 +90,13 @@ int main()
         for (int i = 0; i < 4; i++) {
             gyroscope.set_full_scale(full_scale_modes[i]);
             printf("\n%s\n", scale_mode_names[i]);
-            wait(0.5f);
+            ThisThread::sleep_for(500);
             for (int j = 0; j < 3; j++) {
                 read_and_print_data(&gyroscope);
-                wait(0.2f);
+                ThisThread::sleep_for(200);
                 led = !led;
             }
-            wait(1.5f);
+            ThisThread::sleep_for(1500);
         }
     }
 }

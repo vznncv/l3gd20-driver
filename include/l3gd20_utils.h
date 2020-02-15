@@ -16,7 +16,7 @@ public:
      *
      * @param i2c_ptr I2C interface
      */
-    RegisterDevice(I2C* i2c_ptr);
+    RegisterDevice(I2C *i2c_ptr);
 
     /**
      * Constructor.
@@ -31,7 +31,7 @@ public:
      *
      * @param spi_ptr SPI interface
      */
-    RegisterDevice(SPI* spi_ptr, PinName ssel);
+    RegisterDevice(SPI *spi_ptr, PinName ssel);
 
     /**
      * Constructor.
@@ -93,12 +93,12 @@ public:
      * @param data
      * @param length
      */
-    void read_registers(uint8_t reg, uint8_t* data, uint8_t length);
+    void read_registers(uint8_t reg, uint8_t *data, uint8_t length);
 
 private:
     // helper variable with state flags
-    uint8_t state;
-    enum StateFlags {
+    uint8_t _state;
+    enum StateFlags : uint8_t {
         SPI_DEVICE = 0x01,
         I2C_DEVICE = 0x02,
         CLEANUP_I2C_PTR = 0x04,
@@ -108,15 +108,15 @@ private:
 
     // spi/i2c data
     union Interface {
-        SPI* spi_ptr;
-        I2C* i2c_ptr;
+        SPI *spi_ptr;
+        I2C *i2c_ptr;
     };
-    Interface interface;
+    Interface _interface;
 
     // I2C address (assume SDO pin is set to 0)
-    static const uint8_t I2C_ADDRESS = 0xDA;
+    static const uint8_t _I2C_ADDRESS = 0xDA;
 
-    DigitalOut* spi_ssel_ptr;
+    DigitalOut *_spi_ssel_ptr;
 };
 }
 #endif // L3GD20_UTILS_H

@@ -383,9 +383,9 @@ public:
     float get_temperature_sensor_sensitivity();
 
 private:
-    RegisterDevice register_device;
+    RegisterDevice _register_device;
 
-    static const uint8_t DEVICE_ID = 0xD4;
+    static const uint8_t _DEVICE_ID = 0xD4;
 
     /**
      * Update interrupt register.
@@ -401,10 +401,11 @@ private:
     DataReadyInterruptMode _update_interrupt_register(int mode);
 
     // current gyroscope sensitivity
-    float gyro_sensitivity_dps;
-    float gyro_sensitivity_rps;
+    float _gyro_sensitivity_dps;
+    float _gyro_sensitivity_rps;
 };
 }
+
 using l3gd20::L3GD20Gyroscope;
 
 #endif // L3GD20_DRIVER_H
