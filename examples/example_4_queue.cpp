@@ -34,6 +34,8 @@ public:
         , _block_size(block_size)
         , _sensor_queue()
         , _sensor_thread(osPriorityHigh7)
+        , _calibrate_event(&_sensor_queue, callback(this, &GyroProcessor::_calibrate_callback))
+        , _process_block_event(&_sensor_queue, callback(this, &GyroProcessor::_process_block))
     {
         // configure gyroscope
         _drdy_int.disable_irq();
@@ -57,7 +59,7 @@ public:
         _w_offset[0] = 0.0f;
         _w_offset[1] = 0.0f;
         _w_offset[2] = 0.0f;
-        _drdy_int.rise(_sensor_queue.event(callback(this, &GyroProcessor::_calibrate_callback)));
+        _drdy_int.rise(callback(&_calibrate_event, &Event<void()>::call));
 
         _gyro->set_fifo_watermark(_block_size);
         _gyro->clear_fifo();
@@ -92,7 +94,7 @@ public:
         q[3] = 0.0f;
 
         // run processing thread
-        _drdy_int.rise(_sensor_queue.event(callback(this, &GyroProcessor::_process_block)));
+        _drdy_int.rise(callback(&_process_block_event, &Event<void()>::call));
         _sensor_thread.start(callback(&_sensor_queue, &EventQueue::dispatch_forever));
     }
 
@@ -123,6 +125,9 @@ private:
 
     EventQueue _sensor_queue;
     Thread _sensor_thread;
+
+    Event<void()> _calibrate_event;
+    Event<void()> _process_block_event;
 
     // quaternion that describe current rotation
     float q[4];
@@ -286,8 +291,56 @@ private:
 
 DigitalOut led(LED2);
 
-EventQueue sensor_queue;
-Thread sensor_thread(osPriorityHigh7);
+/**
+ * Helper function to print float number, as default minimal printf implementation doesn't
+ * work correctly.
+ *
+ * @param value
+ * @param width
+ * @param precision
+ */
+void print_float(float value, size_t width, size_t precision)
+{
+    const size_t buf_size = 16;
+    char buf[buf_size];
+    MBED_ASSERT(buf_size > (width + 1));
+    MBED_ASSERT(width > precision + 2);
+    int pos;
+    int int_part;
+    bool neg_sign;
+
+    // get fractional, integer part and sing
+    if (value >= 0) {
+        neg_sign = false;
+    } else {
+        neg_sign = true;
+        value = -value;
+    }
+    int_part = value;
+    value -= int_part;
+
+    // add point
+    pos = buf_size - precision - 1;
+    buf[pos] = '.';
+    // print fractional part
+    pos++;
+    for (size_t i = 0; i < precision; i++) {
+        value *= 10;
+        buf[pos++] = '0' + (int)value;
+        value -= (int)value;
+    }
+    buf[pos] = '\0';
+    // print integer part
+    pos = buf_size - precision - 1;
+    for (size_t i = 0; i < width - 1 - precision; i++) {
+        buf[--pos] = '0' + (int_part % 10);
+        int_part /= 10;
+    }
+    buf[pos] = neg_sign ? '-' : '+';
+
+    // print number
+    printf("%s", buf + pos);
+}
 
 int main()
 {
@@ -312,7 +365,7 @@ int main()
     int block_size = 24;
     GyroProcessor gyro_processor(&gyroscope, block_size, L3GD20_SPI_INT2, LED5);
     // run calibration
-    ThisThread::sleep_for(100);
+    ThisThread::sleep_for(100ms);
     gyro_processor.calibrate(0.9f);
     // run data processing
     gyro_processor.start_async();
@@ -324,9 +377,18 @@ int main()
     while (true) {
         led = !led;
         gyro_processor.get_rotation(&angle, rotation_vec);
-        printf("angle: %+6.2f; x: %+6.2f; y: %+6.2f; z: %+6.2f\n", angle, rotation_vec[0], rotation_vec[1], rotation_vec[2]);
-        ThisThread::sleep_for(16);
+        printf("angle: ");
+        print_float(angle, 6, 2);
+        printf("; x: ");
+        print_float(rotation_vec[0], 6, 2);
+        printf("; y: ");
+        print_float(rotation_vec[1], 6, 2);
+        printf("; z: ");
+        print_float(rotation_vec[2], 6, 2);
+        printf("\n");
+
+        ThisThread::sleep_for(16ms);
         led = !led;
-        ThisThread::sleep_for(16);
+        ThisThread::sleep_for(16ms);
     }
 }

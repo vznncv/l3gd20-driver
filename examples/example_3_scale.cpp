@@ -90,13 +90,13 @@ int main()
         for (int i = 0; i < 4; i++) {
             gyroscope.set_full_scale(full_scale_modes[i]);
             printf("\n%s\n", scale_mode_names[i]);
-            ThisThread::sleep_for(500);
+            ThisThread::sleep_for(500ms);
             for (int j = 0; j < 3; j++) {
                 read_and_print_data(&gyroscope);
-                ThisThread::sleep_for(200);
+                ThisThread::sleep_for(200ms);
                 led = !led;
             }
-            ThisThread::sleep_for(1500);
+            ThisThread::sleep_for(1500ms);
         }
     }
 }

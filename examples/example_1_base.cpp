@@ -46,7 +46,7 @@ int main()
         printf("%04d | wx: %+7.2f dps, wy: %+7.2f dps, wz: %+7.2f dps\n", count, x, y, z);
 
         led = !led;
-        ThisThread::sleep_for(50);
+        ThisThread::sleep_for(50ms);
         count++;
     }
 }

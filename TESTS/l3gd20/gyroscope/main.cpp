@@ -28,7 +28,7 @@ utest::v1::status_t case_setup_handler(const Case *const source, const size_t in
     // reset gyroscope
     int err = gyro->init();
     // wait to skip noisy data after device enabling
-    ThisThread::sleep_for(100);
+    ThisThread::sleep_for(100ms);
 
     utest::v1::status_t gt_status = greentea_case_setup_handler(source, index_of_case);
     if (err) {
@@ -99,7 +99,7 @@ void test_multiple_start_stop()
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
 
-        ThisThread::sleep_for(20);
+        ThisThread::sleep_for(20ms);
 
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_ENABLE, mode);
@@ -108,7 +108,7 @@ void test_multiple_start_stop()
         mode = gyro->get_gyroscope_mode();
         TEST_ASSERT_EQUAL(gyro->G_DISABLE, mode);
 
-        ThisThread::sleep_for(20);
+        ThisThread::sleep_for(20ms);
     }
 }
 
@@ -126,7 +126,7 @@ void test_simple_data_reading()
     const int dt_ms = 50;
     float gyro_vec[3];
     float angular_velocity_abs[n_samples];
-    float angle;
+    float angle = 0.0f;
 
     gyro->set_output_data_rate(L3GD20Gyroscope::ODR_95_HZ);
 
@@ -134,7 +134,7 @@ void test_simple_data_reading()
         gyro->read_data(gyro_vec);
         angular_velocity_abs[i] = abs_vec3(gyro_vec);
         angle += dt_ms * angular_velocity_abs[i] / 1000.0f;
-        ThisThread::sleep_for(dt_ms);
+        ThisThread::sleep_for(chrono::milliseconds(dt_ms));
     }
 
     // check that sensor has noise
@@ -185,17 +185,17 @@ void test_simple_interrupt_usage()
     gyro->set_output_data_rate(L3GD20Gyroscope::ODR_95_HZ);
     InterruptIn drdy_pin(MBED_CONF_L3GD20_DRIVER_TEST_DRDY);
     interrupt_counter_t interrupt_counter(0, 0, 0, 1.0f / gyro->get_output_data_rate_hz(), 1);
-    Callback<void()> interrupt_cb = mbed_highprio_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
-    drdy_pin.rise(interrupt_cb);
+    Event<void()> interrupt_event = mbed_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
+    drdy_pin.rise(callback(&interrupt_event, &Event<void()>::call));
 
     // run interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
     // wait processing
-    ThisThread::sleep_for(500);
+    ThisThread::sleep_for(500ms);
     // disable interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_DISABLE);
     drdy_pin.disable_irq();
-    ThisThread::sleep_for(100);
+    ThisThread::sleep_for(100ms);
 
     // check results
     TEST_ASSERT(interrupt_counter.samples_count > 40);
@@ -217,17 +217,17 @@ void test_fifo_interrupt_usage()
     gyro->set_fifo_mode(L3GD20Gyroscope::FIFO_ENABLE);
     InterruptIn drdy_pin(MBED_CONF_L3GD20_DRIVER_TEST_DRDY);
     interrupt_counter_t interrupt_counter(0, 0, 0, 1.0f / gyro->get_output_data_rate_hz(), fifo_watermark);
-    Callback<void()> interrupt_cb = mbed_highprio_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
-    drdy_pin.rise(interrupt_cb);
+    Event<void()> interrupt_event = mbed_event_queue()->event(callback(&interrupt_counter, &interrupt_counter_t::process_interrupt));
+    drdy_pin.rise(callback(&interrupt_event, &Event<void()>::call));
 
     // run interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_ENABLE);
     // wait processing
-    ThisThread::sleep_for(1125);
+    ThisThread::sleep_for(1125ms);
     // disable interrupts
     gyro->set_data_ready_interrupt_mode(L3GD20Gyroscope::DRDY_DISABLE);
     drdy_pin.disable_irq();
-    ThisThread::sleep_for(100);
+    ThisThread::sleep_for(100ms);
 
     // check results
     TEST_ASSERT_EQUAL(4, interrupt_counter.invokation_count);

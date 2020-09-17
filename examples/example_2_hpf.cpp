@@ -41,7 +41,7 @@ int main()
     printf("Output data rage: %.1f Hz\n", gyroscope.get_output_data_rate_hz());
     printf("Lower cutoff frequency: %6.3f Hz\n", gyroscope.get_high_pass_filter_cut_off_frequency());
     printf("Upper cutoff frequency: %6.3f Hz\n", gyroscope.get_low_pass_filter_cut_off_frequency());
-    ThisThread::sleep_for(2500);
+    ThisThread::sleep_for(2500ms);
 
     // gyroscope dps data
     float w_dps[3];
@@ -53,7 +53,7 @@ int main()
         printf("%04d | wx: %+7.2f dps, wy: %+7.2f dps, xz: %+7.2f dps\n", count, w_dps[0], w_dps[1], w_dps[2]);
 
         led = !led;
-        ThisThread::sleep_for(50);
+        ThisThread::sleep_for(50ms);
         count++;
     }
 }
